@@ -94,21 +94,29 @@ Designed *before* annotation; expanded with real cases found *during* annotation
   `reaction`. A joke that's really smuggling a confident opinion is `hot_take`. Sarcasm is the
   single biggest anticipated source of model error (the surface words invert the meaning).
 
-### 3.4 *(filled during annotation: 3 required hard cases)*
-* **Case A, long but evidence free rant.** *e.g. a 6 sentence paragraph arguing the refs
-  are rigging games against a team, with zero specifics.* Length pattern matches to
-  `analysis`, but there's no verifiable evidence, so **`hot_take`**. Decision: *length is not
-  evidence.* (TODO: confirm the exact comment + id during labeling.)
-* **Case B, quoted stat with a real but thin argument.** *e.g. "He's shooting 38% from
-  three, that's fine, stop overreacting."* One real stat plus a mild claim, so **`analysis`**
-  (the stat is load bearing, not decorative), even though it's short. (TODO: confirm comment.)
-* **Case C, multi sentence emotional venting after a loss that drifts into a take.**
-  Starts as `reaction`, ends with "we need to fire the GM." Decision rule: label by the
-  *dominant* function / final claim. If it lands on a standalone opinion, then `hot_take`;
-  if it stays venting, then `reaction`. (TODO: confirm comment + which way I called it.)
+### 3.4 *(filled during annotation: 3 required hard cases, real comments from the set)*
+* **Case A, long but evidence free rant (id `osyvx7q`).** *"I've watched Giannis play for
+  years and I don't have memory rot... 2 weeks of good play is nothing... people always
+  remember the highlights but not the games he handed to us by bricking jump shot after jump
+  shot..."* A long, multi sentence comment whose length pattern matches `analysis`, but it
+  offers zero verifiable evidence, only assertion and memory. Decision: **`hot_take`**, on the
+  rule *length is not evidence*.
+* **Case B, one load bearing stat (id `oswc8z5`).** *"Castle is 21 and was 6th in assists
+  lol."* Very short, casual tone, but the single stat (6th in assists) is doing the real
+  argumentative work in a debate about whether Castle is a passer, not decorative. Decision:
+  **`analysis`**. Tellingly, another commenter (id `oswadsy`) replied to correct it to "9th in
+  the league," which confirms the stat was a genuine, checkable claim rather than a flourish.
+* **Case C, emotional venting that contains a take (id `osytrru`).** *"Ah now he's trying to
+  compensate and rewrite the narrative around his ring because he realizes he's on the back
+  end of his career... Dude just stop.....you went to a super team to get a ring. Stop the
+  bullshit."* It embeds an opinion (joined a super team for a ring) inside what is dominantly
+  emotional venting at a person. Decision rule: label by the *dominant* function. The register
+  is emotional and in the moment, so **`reaction`**, even though a take is buried in it.
 
-> These three TODOs get replaced with the actual comments + ids while labeling, then copied
-> into the README's "difficult to label examples" section.
+> These three are the boundary cases that the labeling pass kept returning to. They map onto
+> the analysis vs hot_take and reaction vs hot_take confusions, the same two boundaries the
+> model is most likely to miss. They are reused in the README's "difficult to label examples"
+> section.
 
 ***
 
