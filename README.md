@@ -45,26 +45,37 @@ correct. Labels are mutually exclusive.
 * **File:** [`data/labeled_data.csv`](data/labeled_data.csv) (`text, label, notes`), a single
   file; the notebook does the 70/15/15 split.
 
-### Label distribution ⏳ FILL AFTER LABELING
+### Label distribution
 | Label | Count | % |
 |---|---|---|
-| analysis | _ | _ |
-| hot_take | _ | _ |
-| reaction | _ | _ |
-| **Total** | **_** | 100% |
+| analysis | 83 | 28.2% |
+| hot_take | 82 | 27.9% |
+| reaction | 129 | 43.9% |
+| **Total** | **294** | 100% |
 
-*(Target: each class ≥20%, none >70%.)*
+Every class clears the 20% floor and sits well under the 70% ceiling. reaction is the largest,
+which is expected for r/nba (game thread emotion is the most common register), but not dominant.
+The set is 300 collected comments minus 6 automoderator and mod removal messages that were
+dropped as non discourse.
 
-### Three genuinely difficult examples ⏳ FILL AFTER LABELING
-*(Copy the resolved versions of `planning.md §3.4` cases A/B/C here, with the actual comment
-text and the call I made plus why.)*
+### Three genuinely difficult examples
 
-1. **Long but evidence free rant** → labeled `hot_take`. *Why:* length pattern matches to
-   analysis, but there was no verifiable evidence: *length is not evidence.*
-2. **Thin one stat argument** → labeled `analysis`. *Why:* the single stat was load bearing,
-   not decorative, even though the comment was short.
-3. **Emotional venting that drifts into a take** → labeled by *dominant function* or final
-   claim. *Why:* … *(record the actual call)*.
+1. **Long but evidence free rant (id `osyvx7q`).** *"I've watched Giannis play for years and I
+   don't have memory rot... 2 weeks of good play is nothing... people always remember the
+   highlights but not the games he handed to us by bricking jump shot after jump shot."* The
+   length and paragraph structure pattern match to `analysis`, but the comment offers only
+   assertion and memory, no verifiable evidence. Labeled `hot_take` on the rule *length is not
+   evidence*.
+2. **One load bearing stat (id `oswc8z5`).** *"Castle is 21 and was 6th in assists lol."* Very
+   short and casual, but the single stat (6th in assists) is doing the real argumentative work
+   in a debate about whether Castle is a passer, not decorating an opinion. Labeled `analysis`.
+   Another commenter (id `oswadsy`) replied to correct it to "9th in the league," which confirms
+   the stat was a genuine, checkable claim rather than a flourish.
+3. **Emotional venting that contains a take (id `osytrru`).** *"Ah now he's trying to compensate
+   and rewrite the narrative around his ring... Dude just stop.....you went to a super team to
+   get a ring. Stop the bullshit."* It embeds an opinion (joined a super team for a ring) inside
+   what is dominantly emotional venting at a person. Labeled by *dominant function*: the register
+   is emotional and in the moment, so `reaction`, even though a take is buried in it.
 
 ## 4. Fine tuning approach
 
@@ -91,20 +102,22 @@ text and the call I made plus why.)*
 ## 6. Evaluation report ⏳ FILL AFTER COLAB
 
 ### 6.1 Headline metrics
+*Test set n = 45 (15% of 294).*
+
 | Metric | Zero shot baseline | Fine tuned DistilBERT |
 |---|---|---|
-| Overall accuracy | _ | _ |
-| Macro F1 | _ | _ |
+| Overall accuracy | ⏳ pending (Section 5) | 0.622 |
+| Macro F1 | ⏳ pending (Section 5) | 0.55 |
 
 ### 6.2 Per class metrics
-| Label | Model | Precision | Recall | F1 |
-|---|---|---|---|---|
-| analysis | baseline | _ | _ | _ |
-| analysis | fine tuned | _ | _ | _ |
-| hot_take | baseline | _ | _ | _ |
-| hot_take | fine tuned | _ | _ | _ |
-| reaction | baseline | _ | _ | _ |
-| reaction | fine tuned | _ | _ | _ |
+| Label | Model | Precision | Recall | F1 | Support |
+|---|---|---|---|---|---|
+| analysis | baseline | ⏳ | ⏳ | ⏳ | 13 |
+| analysis | fine tuned | 0.80 | 0.31 | 0.44 | 13 |
+| hot_take | baseline | ⏳ | ⏳ | ⏳ | 12 |
+| hot_take | fine tuned | 0.42 | 0.42 | 0.42 | 12 |
+| reaction | baseline | ⏳ | ⏳ | ⏳ | 20 |
+| reaction | fine tuned | 0.68 | 0.95 | 0.79 | 20 |
 
 ### 6.3 Confusion matrix (fine tuned, test set)
 *Rows = true label, columns = predicted. Also committed as
@@ -112,18 +125,53 @@ text and the call I made plus why.)*
 
 | true \ pred | analysis | hot_take | reaction |
 |---|---|---|---|
-| **analysis** | _ | _ | _ |
-| **hot_take** | _ | _ | _ |
-| **reaction** | _ | _ | _ |
+| **analysis** | 4 | 6 | 3 |
+| **hot_take** | 1 | 5 | 6 |
+| **reaction** | 0 | 1 | 19 |
 
-### 6.4 Three wrong predictions, analyzed ⏳ FILL AFTER COLAB
-*(Pull from `analysis/wrong_predictions.csv`. For each: the comment, true vs predicted, and a
-real diagnosis using the guiding questions: which boundary failed, why it's hard, whether
-it's a labeling vs data problem, and what would fix it.)*
+*Reading: the diagonal (4, 5, 19) is correct. The two heavy off diagonal cells are
+analysis to hot_take (6) and hot_take to reaction (6), the two subjective boundaries. reaction
+is almost never missed (19 of 20).*
 
-1. **Comment:** … **true** `analysis` / **pred** `hot_take`. *Why:* …
-2. **Comment:** … **true** `_` / **pred** `_`. *Why:* …
-3. **Comment:** … **true** `_` / **pred** `_`. *Why:* …
+### 6.4 Three wrong predictions, analyzed
+
+Context: all 17 of the fine tuned model's test errors came with confidence between 0.34 and
+0.37, barely above the 0.33 random floor. The model is not confidently wrong, it is uncertain,
+and that uncertainty falls on exactly the two subjective boundaries. The three below are chosen
+to cover each confusion direction (analysis to hot_take, hot_take to reaction, analysis to
+reaction).
+
+1. **Comment (id `ost0weg`):** *"I didnt read the article but... 11.6k in expenses (140k a
+   year) 7k baby mama fees... even if you cut 60% of his nba earnings for taxes and agent fees
+   thats 70 million left over... If he just saved 40 million... thats 400k for 100 years after
+   taxes... His current lifestyle is more than manageable."* **true** `analysis` / **pred**
+   `hot_take` (conf 0.34). *Why:* this is the core `analysis` to `hot_take` failure. The comment
+   is a multi step quantitative argument (it does real arithmetic to reach a conclusion), but
+   the model reads it as just another confident opinion. It has not learned that the numbers
+   here are load bearing rather than decorative. This is a **data and task** problem, not a
+   labeling one: with only about 206 training examples, the model never saw enough worked
+   numeric arguments to separate "math that supports a claim" from "a stat dropped for effect."
+   Fix: more `analysis` examples that reason through numbers, and more `hot_take` examples that
+   cite a stat decoratively, so the boundary is drawn by *how* the number is used.
+
+2. **Comment (id `osyv4hk`):** *"I'd prefer we spend the next season with Maluach utilized for
+   20+ minutes to develop."* **true** `hot_take` / **pred** `reaction` (conf 0.37). *Why:* the
+   `hot_take` to `reaction` failure. This is a calm, standalone roster opinion with no evidence,
+   which is the definition of a hot take, but it is short and casually worded, so the model
+   keys on register and files it as an in the moment reaction. The model appears to use tone and
+   length as a proxy for `reaction` rather than detecting whether a standalone claim is being
+   made. Fix: more short, calm `hot_take` examples so brevity and a low key tone stop being
+   read as emotional.
+
+3. **Comment (id `osyua9k`):** *"It was literally the same script everytime, Luka dropping
+   carrying and dropping 30/10/10 thru 3 quarters then wearing down while Kawhi just didnt miss
+   in the 4th."* **true** `analysis` / **pred** `reaction` (conf 0.34). *Why:* this is an
+   observed tactical pattern backed by a stat line (30/10/10, the fourth quarter fade), which is
+   `analysis` by the rubric, yet it was predicted `reaction`. It shows that **numbers alone do
+   not trigger `analysis`** in this model: combined with the 0.31 `analysis` recall, the model
+   rarely commits to `analysis` at all and defaults to the easier classes. It is also one of the
+   genuinely contestable one stat calls from annotation, so the model's confusion mirrors the
+   human difficulty at this boundary rather than being plainly wrong.
 
 ### 6.5 Sample classifications (fine tuned)
 *3 to 5 posts run through the model with predicted label + confidence. At least one correct
