@@ -254,11 +254,29 @@ That uniform low confidence is the softmax mirror of the underfit loss.
 
 ## 8. Spec reflection
 
-* **One way the spec (`planning.md`) helped:** ⏳ *(e.g. forcing the one stat decision rule in
-  §3.1 before annotating kept analysis vs hot_take labeling consistent across 200 examples.)*
-* **One way the implementation diverged from the spec, and why:** ⏳ *(record an actual
-  divergence, e.g. a label boundary you had to redraw after seeing real data, or a class you
-  had to overcollect to clear the 20% floor.)*
+* **One way the spec (`planning.md`) helped.** Writing the §3.1 "one stat" decision rule before
+  annotating anything was the single most useful thing the spec did. The rule (label `analysis`
+  only if the stat would still support the claim with the opinion framing stripped out, otherwise
+  `hot_take`) gave a concrete, repeatable tie breaker for the hardest boundary, so the analysis
+  versus hot_take calls stayed consistent across all 294 comments instead of drifting. It paid off
+  twice: it kept the training labels coherent, and it gave me precise language to describe the
+  model's main failure, that it never learned the load bearing versus decorative distinction
+  (§6.4, §7). Without that rule committed to writing first, I could not have told whether the
+  model's analysis to hot_take confusion was its fault or my own inconsistent labeling.
+* **One way the implementation diverged from the spec, and why.** Planning §4 specified collecting
+  comments with `collect.py` using PRAW, with the public reddit `.json` endpoints as a no auth
+  fallback. Neither worked: reddit returned 403 (blocked) on every unauthenticated request from
+  this network, and the authenticated API host was unreachable as well. So I pivoted the collector
+  to the arctic-shift public reddit archive, a no auth mirror of public reddit data, and kept PRAW
+  and `.json` as alternate backends behind a `--source` flag. The taxonomy, filters, target
+  distribution, and the public data only constraint were all unchanged; only the transport
+  changed. A smaller knock on effect followed: the archive route could not cleanly isolate game
+  threads from the general feed, so the planned thread type mix (about 40% game threads, 40%
+  discussion, 20% opinion bait) became a source mix instead (about 65% r/nba for the broad
+  discourse range, 35% r/nbadiscussion to boost `analysis`). The intent, keeping label variety
+  uncorrelated with any single source, was preserved even though the exact sampling frame changed.
+  I updated planning §4 to record the real source rather than leave the spec describing a method I
+  did not use.
 
 ## 9. Stretch features
 
