@@ -1,62 +1,56 @@
 # Baseline prompt (Groq zero shot): notebook Section 5
 
-This is the exact prompt for the **zero shot baseline**: `llama-3.3-70b-versatile`
-classifying each test comment with no task specific training. Paste it into the notebook's
-Section 5 prompt cell. The notebook parses the response, so the model must output **only the
-label name**.
+This is the exact prompt used for the **zero shot baseline**: `llama-3.3-70b-versatile`
+classifying each test comment with no task specific training. It is pasted into the notebook's
+Section 5 `SYSTEM_PROMPT` cell and used as a **system message**; the notebook passes each comment
+as a separate **user message**. The model outputs only the label name, which the notebook parses.
 
-The label definitions below are copied verbatim from `planning.md §2` so the baseline is
-judged on the same rubric as the fine tuned model.
+The label definitions are taken from `planning.md §2`, with **one illustrative example per
+label**. The examples come from the §2 taxonomy, **not** from the test set, so the baseline sees
+no test data.
 
 ***
 
-## System / instruction prompt
+## The prompt
 
 ```
-You are classifying comments from r/nba (a basketball subreddit) by HOW the comment supports
-its claim, not by topic and not by whether the claim is correct.
+You are classifying comments from r/nba (a basketball subreddit) by HOW each comment supports its claim, not by topic and not by whether the claim is correct. Assign each comment to exactly one of these three categories.
 
-Choose exactly ONE of these three labels:
+analysis: A structured argument backed by specific, verifiable evidence (stats, historical comparison, tactical or film observation, or a clear causal chain). If you strip the opinion framing, a real argument remains.
+Example: "Their half court defensive rating is 3rd since the All Star break; the regression is entirely in transition (12th to 27th). That is effort, not scheme."
 
-analysis:  A structured argument backed by specific, verifiable evidence: statistics,
-            historical comparison, tactical/film observation, or a clear causal chain. If you
-            removed the opinion framing, a real argument would remain.
+hot_take: A bold, confident opinion asserted without genuine supporting evidence. The claim may be correct, but it asserts rather than argues. A decorative or cherry picked stat that only sounds credible still counts.
+Example: "Jokic is the most skilled big man to ever touch a basketball and it is not close. Anyone who disagrees does not watch basketball."
 
-hot_take:  A bold, confident opinion asserted WITHOUT genuine supporting evidence. The claim
-            may be correct, but the comment asserts rather than argues. A decorative or
-            cherry picked stat that exists only to sound credible still counts as hot_take.
-
-reaction:  An immediate emotional response to a specific play, game, or event. Little to no
-            argument; the comment is expressing a feeling in the moment (hype, despair, shock,
-            humor).
+reaction: An immediate emotional response to a play, game, or event. Little to no argument; expressing a feeling in the moment (hype, despair, shock, humor).
+Example: "BANG. game over. I am levitating right now."
 
 Rules:
-* Output ONLY the label: analysis, hot_take, or reaction.
-* No punctuation, no explanation, no quotes, just the single word.
-* If a comment is emotional with only a throwaway justification, it is reaction.
-* If a comment is long but gives no verifiable evidence, it is hot_take (length is not evidence).
+Output ONLY the label name, one lowercase word, nothing else.
+No punctuation, no explanation, no quotes.
+If a comment is emotional with only a throwaway justification, it is reaction.
+If a comment is long but gives no verifiable evidence, it is hot_take (length is not evidence).
 
-Comment:
-{text}
+Respond with ONLY the label name.
+Do not explain your reasoning.
 
-Label:
+Valid labels:
+analysis
+hot_take
+reaction
 ```
 
 ***
 
 ## Notes for running it
+* **Temperature 0** for determinism and reproducibility.
+* **max_tokens** small (about 4): only one word is needed.
+* All **45 of 45** test responses parsed cleanly (0% unparseable), so no tightening was needed.
 
-* **Temperature 0** for determinism/reproducibility.
-* **max_tokens** small (e.g. 4): we only need one word.
-* The notebook flags unparseable responses. If >~10% are unparseable, the model is adding
-  extra words; reinforce "Output ONLY the label" and re run. The `analysis|hot_take|reaction`
-  normalization (lowercasing, `-`→`_`) is already handled in `prelabel.py` and should be
-  mirrored in the notebook's parser if needed.
-* **Record the baseline results** (overall accuracy + per class precision/recall/F1) before
-  fine tuning. These go in the README evaluation report next to the fine tuned numbers.
-
-## Hypothesis to test after fine tuning (planning.md §5)
-The baseline will likely do *fine* on `reaction` (emotional language is obvious to a 70B
-model) but struggle on the `analysis` vs `hot_take` boundary: the subjective "is this
-evidence load bearing or decorative?" call. Note where it confuses those two; that's the gap
-fine tuning needs to close.
+## What the baseline showed (planning.md §5 hypothesis, revisited)
+The §5 hypothesis was that the baseline would do fine on `reaction` but struggle on the
+`analysis` versus `hot_take` boundary. The result was the opposite of that second half: the 70B
+scored F1 0.85 on `analysis` and 0.81 on `hot_take`, handling that subjective boundary well. It
+was the fine tuned DistilBERT that failed there (F1 0.44 and 0.42). So the hard boundary is hard
+for a small model trained on a few hundred examples, not for a large general model with good
+label definitions. That contrast is the core of the evaluation report.

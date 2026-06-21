@@ -8,8 +8,11 @@ emotional response).
 *AI201 Project 3. Design notes live in [`planning.md`](planning.md); this README is the final
 report.*
 
-> **Status:** scaffolding + design complete. Sections marked `⏳ FILL AFTER COLAB` are
-> populated after fine tuning in the course Colab notebook.
+> **Status:** fine tuning and the zero shot baseline are done and the evaluation report is
+> written. **Headline finding: the zero shot Groq baseline (0.844 accuracy) beat the fine tuned
+> DistilBERT (0.622).** Remaining `⏳` items are §6.5 sample classifications and the local
+> calibration table (both need the downloaded `takemeter-model/`), §8 spec reflection, §11 AI
+> usage, and §12 demo.
 
 ***
 
@@ -92,32 +95,48 @@ dropped as non discourse.
 
 * **Model:** `llama-3.3-70b-versatile`, temperature 0, classifying each **test** comment with
   no task specific training.
-* **Prompt:** the exact prompt in [`baseline_prompt.md`](baseline_prompt.md) (label
-  definitions verbatim from planning.md plus "output only the label name").
-* **How results were collected:** run in the notebook's Section 5 over the locked test split;
-  unparseable responses are flagged and the prompt tightened if >~10% fail to parse.
+* **Prompt:** the exact prompt in [`baseline_prompt.md`](baseline_prompt.md): the label
+  definitions verbatim from planning.md, one illustrative example per label (taken from the
+  planning §2 taxonomy, **not** from the test set, so the baseline sees no test data), and
+  "output only the label name." Passed as a system message with the comment as a separate user
+  message.
+* **How results were collected:** run in the notebook's Section 5 over the locked test split.
+  All 45 of 45 responses parsed cleanly (0% unparseable), so no prompt tightening was needed.
 
 ***
 
-## 6. Evaluation report ⏳ FILL AFTER COLAB
+## 6. Evaluation report
 
 ### 6.1 Headline metrics
 *Test set n = 45 (15% of 294).*
 
 | Metric | Zero shot baseline | Fine tuned DistilBERT |
 |---|---|---|
-| Overall accuracy | ⏳ pending (Section 5) | 0.622 |
-| Macro F1 | ⏳ pending (Section 5) | 0.55 |
+| Overall accuracy | **0.844** | 0.622 |
+| Macro F1 | **0.84** | 0.55 |
+
+**Headline finding: the zero shot 70B baseline beat the fine tuned model by 22 accuracy points
+(0.29 macro F1).** Fine tuning regressed. This is the most important result in the report and §7
+explains why: a large general model handles the subjective "is the evidence load bearing"
+judgment that DistilBERT cannot learn from roughly 206 training examples. This is not a bug or
+leakage (leakage would inflate the fine tuned score; the classes are balanced; the drop is
+consistent with the fine tuned model's failure on the analysis and hot_take classes below).
 
 ### 6.2 Per class metrics
 | Label | Model | Precision | Recall | F1 | Support |
 |---|---|---|---|---|---|
-| analysis | baseline | ⏳ | ⏳ | ⏳ | 13 |
+| analysis | baseline | 0.85 | 0.85 | 0.85 | 13 |
 | analysis | fine tuned | 0.80 | 0.31 | 0.44 | 13 |
-| hot_take | baseline | ⏳ | ⏳ | ⏳ | 12 |
+| hot_take | baseline | 0.73 | 0.92 | 0.81 | 12 |
 | hot_take | fine tuned | 0.42 | 0.42 | 0.42 | 12 |
-| reaction | baseline | ⏳ | ⏳ | ⏳ | 20 |
+| reaction | baseline | 0.94 | 0.80 | 0.86 | 20 |
 | reaction | fine tuned | 0.68 | 0.95 | 0.79 | 20 |
+
+The per class view is where the regression becomes legible. The baseline is strong and even
+across all three classes (F1 0.85 / 0.81 / 0.86). The fine tuned model is only competitive on
+`reaction` (0.79 vs 0.86) and collapses on the two subjective classes: `analysis` F1 0.44 (it
+recalls only 31% of true analysis) and `hot_take` F1 0.42. The boundary the baseline handles
+cleanly is exactly the one fine tuning failed to learn.
 
 ### 6.3 Confusion matrix (fine tuned, test set)
 *Rows = true label, columns = predicted. The markdown table below is the primary version; the
@@ -187,13 +206,33 @@ example explained.*
 
 ***
 
-## 7. Reflection: what the model learned vs. what I intended ⏳ FILL AFTER COLAB
+## 7. Reflection: what the model learned vs. what I intended
 
-*(Higher level than the error list. Did the model learn "evidence vs assertion," or a proxy
-like length, presence of numbers, or capslock? What did it overfit to and what did it miss?
-e.g. "I intended it to judge whether evidence is load bearing; in practice it appears to treat
-any numeric token as a signal for `analysis`, which is why cherry picked stat hot_takes fool
-it.")*
+I intended the classifier to learn the taxonomy's real axis: *how a claim is supported*,
+evidence versus assertion versus emotion. What the fine tuned model actually learned, from
+roughly 206 training examples, is mostly the easiest slice of that axis: emotional register maps
+to `reaction`, and it learned that part well (reaction recall 0.95). It did not learn the load
+bearing evidence distinction that separates `analysis` from `hot_take`, which is the entire point
+of the labels. Its `analysis` recall is 0.31, so it rarely commits to `analysis` at all, and when
+unsure it falls back to `hot_take` or `reaction`.
+
+A tempting hypothesis was that it learned a shallow proxy like "numbers mean analysis." The
+errors refute that: comments with real stat lines (Castle "6th in assists", the Luka "30/10/10"
+pattern) were predicted `reaction`, and a worked financial calculation was predicted `hot_take`.
+So it is not over firing on numeric tokens, it simply has not learned what makes evidence count
+and defaults conservatively.
+
+The clearest evidence of the gap is the baseline comparison. The zero shot 70B reaches F1 0.85
+and 0.81 on `analysis` and `hot_take` by bringing general reasoning to whether a claim is
+actually argued. DistilBERT cannot acquire that judgment from a few hundred subjective examples,
+so fine tuning a small model here did not merely fail to help, it underperformed the untrained
+large model by 22 points. The honest takeaway: for a subjective, reasoning heavy distinction on a
+small dataset, a well prompted large model is the stronger tool, and the fine tuned model's value
+is that its failures are legible and well calibrated, not that it is accurate.
+
+Tie to calibration: the small model is honestly uncertain rather than confidently wrong. Every
+one of its 17 test errors landed at 0.34 to 0.37 confidence, just above the 0.33 floor, so its
+mistakes cluster exactly where its confidence is lowest.
 
 ## 8. Spec reflection
 
@@ -207,10 +246,20 @@ it.")*
 
 * **Deployed interface:** [`app.py`](app.py): Gradio UI, paste a comment → label + confidence
   bars. See §10 to run.
-* **Confidence calibration:** [`analysis/analyze.py`](analysis/analyze.py): reliability table
-  binning predictions by confidence vs actual accuracy. ⏳ *findings here.*
-* **Error pattern analysis:** beyond individual errors, the systematic pattern (hypothesis:
-  sarcasm + the analysis↔hot_take boundary). ⏳ *verified pattern here.*
+* **Confidence calibration:** [`analysis/analyze.py`](analysis/analyze.py) bins predictions by
+  confidence against actual accuracy. **Finding:** all 17 fine tuned test errors fell in the 0.34
+  to 0.37 confidence band, barely above the 0.33 random floor, while correct predictions carried
+  higher confidence. So confidence is meaningful here: low confidence reliably flags likely
+  errors, which means a deployed tool could abstain below a threshold and surface only its high
+  confidence calls. The exact reliability table is reproduced locally with
+  `python analysis/analyze.py --test data/test_split.csv` once `takemeter-model/` is downloaded.
+* **Error pattern analysis:** the systematic pattern is two directional confusions: `analysis`
+  predicted `hot_take` (the model under credits real, sometimes non numeric reasoning) and
+  `hot_take` predicted `reaction` (short or casual opinions read as emotional venting). Numbers
+  alone do not trigger `analysis`. My original hypothesis (sarcasm plus the analysis versus
+  hot_take boundary) is half confirmed: analysis versus hot_take is indeed the dominant error
+  source, but the bigger surprise is `hot_take` leaking into `reaction` through tone. Verified by
+  rereading the 17 misclassifications, not just counting them.
 * **Inter annotator reliability:** [`analysis/iaa.py`](analysis/iaa.py): a second annotator
   labeled 30 examples; Cohen's kappa + agreement + disagreement analysis. ⏳ *numbers here.*
 
