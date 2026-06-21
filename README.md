@@ -84,12 +84,22 @@ dropped as non discourse.
 
 * **Base model:** `distilbert-base-uncased` (HuggingFace), a small, fast encoder well suited
   to a 3 class sequence classification task on a few hundred examples.
-* **Setup:** course Colab notebook, free **T4 GPU**, `transformers` Trainer. 70/15/15
-  train/val/test split (stratified).
-* **Key hyperparameter decision:** ⏳ *(start from the notebook defaults, 3 epochs, lr 2e-5,
-  batch 16, and document the one change you make. Planned decision: bump epochs to ~5 if the
-  validation loss is still falling at epoch 3, since 200 examples is small and underfits
-  quickly. Record what you actually chose and why.)*
+* **Setup:** course Colab notebook, free **T4 GPU**, `transformers` `Trainer`. 70/15/15
+  stratified split (206 train, 44 validation, 45 test). `TrainingArguments`: 3 epochs, learning
+  rate 2e-5, train batch 16 (eval batch 32), weight decay 0.01, 50 warmup steps,
+  `load_best_model_at_end=True` on validation accuracy with `save_total_limit=1`.
+* **Key hyperparameter decision and what the training log revealed:** I kept the notebook defaults
+  (3 epochs, lr 2e-5, batch 16). Because of `load_best_model_at_end`, the saved model is the
+  **epoch 2** checkpoint (best validation accuracy 0.61; epoch 3 fell to 0.55 on the noisy 44
+  example validation set). The more important signal is that **the model underfit**: training and
+  validation loss fell monotonically but only from about 1.10 to 1.02 across the three epochs, and
+  1.10 is essentially the random loss for three classes (ln 3 is about 1.10). The loss was still
+  descending at epoch 3, so 3 epochs was too few here. The usual concern with a few hundred
+  examples is overfitting; the opposite happened. The model barely moved off the uniform prior,
+  which is consistent with its low confidence errors (§6.4) and its habit of defaulting to the
+  easy `reaction` class. The honest decision: leave it at 3 epochs and report the undertrained
+  result rather than tuning to chase a number. More epochs or a higher learning rate would likely
+  raise the fine tuned score, though probably not past the 0.844 zero shot baseline.
 
 ## 5. Baseline (zero shot Groq)
 
@@ -229,6 +239,10 @@ so fine tuning a small model here did not merely fail to help, it underperformed
 large model by 22 points. The honest takeaway: for a subjective, reasoning heavy distinction on a
 small dataset, a well prompted large model is the stronger tool, and the fine tuned model's value
 is that its failures are legible and well calibrated, not that it is accurate.
+
+Part of the gap is also undertraining (see §4): in 3 epochs the loss barely moved off the three
+class random level and was still falling, so the fine tuned model is underfit as well as data
+starved. That makes the low confidence expected rather than surprising.
 
 Tie to calibration: the small model is honestly uncertain rather than confidently wrong. Every
 one of its 17 test errors landed at 0.34 to 0.37 confidence, just above the 0.33 floor, so its
