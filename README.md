@@ -205,14 +205,17 @@ reaction).
    human difficulty at this boundary rather than being plainly wrong.
 
 ### 6.5 Sample classifications (fine tuned)
-*3 to 5 posts run through the model with predicted label + confidence. At least one correct
-example explained.*
+Five test comments run through the fine tuned model (three it got right, two it got wrong). Note
+how compressed the confidence column is: even the correct calls sit at 0.38, barely above the
+0.33 chance floor (see the calibration discussion in §9).
 
-| Comment | Predicted | Confidence | Note |
-|---|---|---|---|
-| _ | _ | _% | ✅ correct, *why this is reasonable: …* |
-| _ | _ | _% | |
-| _ | _ | _% | |
+| Comment | Predicted | True | Confidence | Note |
+|---|---|---|---|---|
+| "You're the LeBron James of Quagmires" | reaction | reaction | 38% | ✅ correct. A pure joke with no claim or evidence, an in the moment quip, which is exactly what `reaction` is meant to capture. A reasonable call. |
+| "Slow news day, huh?" | reaction | reaction | 38% | ✅ correct. Offhand snark, no argument. |
+| "What's with the lebron glaze this past week" | reaction | reaction | 38% | ✅ correct. A complaint expressed as a feeling, not an argued claim. |
+| "so ya kawhi lead the raptors to chip and kd hasn't yet" | reaction | hot_take | 35% | ❌ wrong. A confident comparative claim, but short and casual, so the model read the tone as emotion (the hot_take to reaction failure from §6.4). |
+| "I mean skinny big guys like KD and Porzingis got game planned like this. For KD it eventually stops working because he was totally prepared for it..." | hot_take | analysis | 35% | ❌ wrong. A real tactical argument with named comparisons, but the model under credited the reasoning (the analysis to hot_take failure). |
 
 ***
 
@@ -244,9 +247,10 @@ Part of the gap is also undertraining (see §4): in 3 epochs the loss barely mov
 class random level and was still falling, so the fine tuned model is underfit as well as data
 starved. That makes the low confidence expected rather than surprising.
 
-Tie to calibration: the small model is honestly uncertain rather than confidently wrong. Every
-one of its 17 test errors landed at 0.34 to 0.37 confidence, just above the 0.33 floor, so its
-mistakes cluster exactly where its confidence is lowest.
+Tie to calibration: the small model is uniformly unconfident. All 45 test predictions sit in a
+narrow band near the 0.33 floor (mean 0.357), correct and wrong alike, so it is never confidently
+wrong, but its confidence also carries no usable signal to tell good predictions from bad (§9).
+That uniform low confidence is the softmax mirror of the underfit loss.
 
 ## 8. Spec reflection
 
@@ -260,13 +264,26 @@ mistakes cluster exactly where its confidence is lowest.
 
 * **Deployed interface:** [`app.py`](app.py): Gradio UI, paste a comment → label + confidence
   bars. See §10 to run.
-* **Confidence calibration:** [`analysis/analyze.py`](analysis/analyze.py) bins predictions by
-  confidence against actual accuracy. **Finding:** all 17 fine tuned test errors fell in the 0.34
-  to 0.37 confidence band, barely above the 0.33 random floor, while correct predictions carried
-  higher confidence. So confidence is meaningful here: low confidence reliably flags likely
-  errors, which means a deployed tool could abstain below a threshold and surface only its high
-  confidence calls. The exact reliability table is reproduced locally with
-  `python analysis/analyze.py --test data/test_split.csv` once `takemeter-model/` is downloaded.
+* **Confidence calibration:** binning the 45 test predictions by the confidence of the predicted
+  class gives a degenerate reliability table:
+
+  | Confidence bin | n | Avg confidence | Accuracy |
+  |---|---|---|---|
+  | 0.33 to 0.40 | 45 | 0.357 | 0.622 |
+  | 0.40 to 0.50 | 0 | NA | NA |
+  | 0.50 to 0.60 | 0 | NA | NA |
+  | 0.60 to 1.00 | 0 | NA | NA |
+
+  **Finding: the model's confidence is not meaningful here.** Every single prediction lands in one
+  narrow band just above the 0.33 random floor; the model never produces a confidence above 0.40.
+  So the calibration question the stretch asks ("does a 90% confident prediction get it right more
+  often than a 60% one?") cannot even be tested: there are no confident predictions. Correct calls
+  average only marginally higher than errors (about 0.38 versus 0.35), a gap far too small and in
+  too narrow a band to use as an abstain threshold. This is a direct symptom of the underfitting
+  in §4: with the training loss stuck near the three class random level, the softmax stays close
+  to uniform. The model is never confidently wrong, but it is never confidently right either, so
+  confidence offers no usable signal for a deployed tool. (Reproduce locally with
+  `python analysis/analyze.py --test data/test_split.csv` once `takemeter-model/` is downloaded.)
 * **Error pattern analysis:** the systematic pattern is two directional confusions: `analysis`
   predicted `hot_take` (the model under credits real, sometimes non numeric reasoning) and
   `hot_take` predicted `reaction` (short or casual opinions read as emotional venting). Numbers
