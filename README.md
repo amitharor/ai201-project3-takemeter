@@ -5,56 +5,50 @@ comment, it predicts whether the comment is **`analysis`** (an evidence backed a
 **`hot_take`** (a confident opinion with no real support), or **`reaction`** (an in the moment
 emotional response).
 
-*AI201 Project 3. Design notes live in [`planning.md`](planning.md); this README is the final
-report.*
+_AI201 Project 3. Design notes in [`planning.md`](planning.md)._
 
-> **Status:** fine tuning and the zero shot baseline are done and the evaluation report is
-> written. **Headline finding: the zero shot Groq baseline (0.844 accuracy) beat the fine tuned
-> DistilBERT (0.622).** Remaining `⏳` items are §6.5 sample classifications and the local
-> calibration table (both need the downloaded `takemeter-model/`), §8 spec reflection, §11 AI
-> usage, and §12 demo.
-
-***
+---
 
 ## 1. Community choice and reasoning
 
-I chose **r/nba**. "What makes a good take" is *native* community vocabulary there. Users
+I chose **r/nba**. "What makes a good take" is _native_ community vocabulary there. Users
 routinely call each other out for "hot takes," praise "actual analysis," and dismiss "just
 reaction." A single game thread mixes one word emotional bursts, confident unsupported
-opinions, and genuinely reasoned breakdowns, often about the *same* topic. That topic overlap
+opinions, and genuinely reasoned breakdowns, often about the _same_ topic. That topic overlap
 is what makes the task nontrivial: the classifier can't key off subject matter, it has to
-learn *how a claim is supported*. See [`planning.md §1`](planning.md).
+learn _how a claim is supported_. See [`planning.md §1`](planning.md).
 
 ## 2. Label taxonomy
 
 The decision axis is **how the claim is supported**, not the topic or whether the claim is
 correct. Labels are mutually exclusive.
 
-| Label | Definition | Example 1 | Example 2 |
-|---|---|---|---|
-| **analysis** | Structured argument backed by specific, verifiable evidence (stats, historical comparison, tactical observation). Strip the opinion framing and a real argument remains. | *"Their half court D rating is 3rd since the break. The regression is entirely in transition (12th, 27th). That's effort, not scheme."* | *"Wemby's already a better rim protector than rookie KAT (3.6 vs 1.7 BPG) on similar 3pt volume. That's the whole case for him being a different tier."* |
-| **hot_take** | A bold, confident opinion asserted without genuine evidence. Decorative, cherry picked stats that only sound credible still count. | *"Jokic is the most skilled big to ever touch a basketball and it's not close. Anyone who disagrees doesn't watch basketball."* | *"The Lakers are making the Finals this year, book it."* |
-| **reaction** | Immediate emotional response to a play/game/event. Little to no argument. | *"NOOOO not again every single year man I can't do this 😭"* | *"BANG. game over. I'm levitating right now."* |
+| Label        | Definition                                                                                                                                                               | Example 1                                                                                                                               | Example 2                                                                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **analysis** | Structured argument backed by specific, verifiable evidence (stats, historical comparison, tactical observation). Strip the opinion framing and a real argument remains. | _"Their half court D rating is 3rd since the break. The regression is entirely in transition (12th, 27th). That's effort, not scheme."_ | _"Wemby's already a better rim protector than rookie KAT (3.6 vs 1.7 BPG) on similar 3pt volume. That's the whole case for him being a different tier."_ |
+| **hot_take** | A bold, confident opinion asserted without genuine evidence. Decorative, cherry picked stats that only sound credible still count.                                       | _"Jokic is the most skilled big to ever touch a basketball and it's not close. Anyone who disagrees doesn't watch basketball."_         | _"The Lakers are making the Finals this year, book it."_                                                                                                 |
+| **reaction** | Immediate emotional response to a play/game/event. Little to no argument.                                                                                                | _"NOOOO not again every single year man I can't do this 😭"_                                                                            | _"BANG. game over. I'm levitating right now."_                                                                                                           |
 
 ## 3. Dataset
 
-* **Source:** public r/nba comments collected with [`collect.py`](collect.py) (PRAW, with a
+- **Source:** public r/nba comments collected with [`collect.py`](collect.py) (PRAW, with a
   no auth `.json` fallback), sampled across a **mix of thread types** (game and post game threads
   that are reaction rich, r/nbadiscussion serious threads that are analysis rich, and opinion bait posts
   that are hot_take rich) so labels don't correlate with thread type. Public content only.
-* **Labeling process:** each comment read and labeled by hand against the
-  [`planning.md §2`](planning.md) definitions. *(Optionally prelabeled by Groq via
-  [`prelabel.py`](prelabel.py) and then reviewed and corrected row by row: see §11 AI usage.)*
-* **File:** [`data/labeled_data.csv`](data/labeled_data.csv) (`text, label, notes`), a single
+- **Labeling process:** each comment read and labeled by hand against the
+  [`planning.md §2`](planning.md) definitions. _(Optionally prelabeled by Groq via
+  [`prelabel.py`](prelabel.py) and then reviewed and corrected row by row: see §11 AI usage.)_
+- **File:** [`data/labeled_data.csv`](data/labeled_data.csv) (`text, label, notes`), a single
   file; the notebook does the 70/15/15 split.
 
 ### Label distribution
-| Label | Count | % |
-|---|---|---|
-| analysis | 83 | 28.2% |
-| hot_take | 82 | 27.9% |
-| reaction | 129 | 43.9% |
-| **Total** | **294** | 100% |
+
+| Label     | Count   | %     |
+| --------- | ------- | ----- |
+| analysis  | 83      | 28.2% |
+| hot_take  | 82      | 27.9% |
+| reaction  | 129     | 43.9% |
+| **Total** | **294** | 100%  |
 
 Every class clears the 20% floor and sits well under the 70% ceiling. reaction is the largest,
 which is expected for r/nba (game thread emotion is the most common register), but not dominant.
@@ -63,32 +57,32 @@ dropped as non discourse.
 
 ### Three genuinely difficult examples
 
-1. **Long but evidence free rant (id `osyvx7q`).** *"I've watched Giannis play for years and I
+1. **Long but evidence free rant (id `osyvx7q`).** _"I've watched Giannis play for years and I
    don't have memory rot... 2 weeks of good play is nothing... people always remember the
-   highlights but not the games he handed to us by bricking jump shot after jump shot."* The
+   highlights but not the games he handed to us by bricking jump shot after jump shot."_ The
    length and paragraph structure pattern match to `analysis`, but the comment offers only
-   assertion and memory, no verifiable evidence. Labeled `hot_take` on the rule *length is not
-   evidence*.
-2. **One load bearing stat (id `oswc8z5`).** *"Castle is 21 and was 6th in assists lol."* Very
+   assertion and memory, no verifiable evidence. Labeled `hot_take` on the rule _length is not
+   evidence_.
+2. **One load bearing stat (id `oswc8z5`).** _"Castle is 21 and was 6th in assists lol."_ Very
    short and casual, but the single stat (6th in assists) is doing the real argumentative work
    in a debate about whether Castle is a passer, not decorating an opinion. Labeled `analysis`.
    Another commenter (id `oswadsy`) replied to correct it to "9th in the league," which confirms
    the stat was a genuine, checkable claim rather than a flourish.
-3. **Emotional venting that contains a take (id `osytrru`).** *"Ah now he's trying to compensate
+3. **Emotional venting that contains a take (id `osytrru`).** _"Ah now he's trying to compensate
    and rewrite the narrative around his ring... Dude just stop.....you went to a super team to
-   get a ring. Stop the bullshit."* It embeds an opinion (joined a super team for a ring) inside
-   what is dominantly emotional venting at a person. Labeled by *dominant function*: the register
+   get a ring. Stop the bullshit."_ It embeds an opinion (joined a super team for a ring) inside
+   what is dominantly emotional venting at a person. Labeled by _dominant function_: the register
    is emotional and in the moment, so `reaction`, even though a take is buried in it.
 
 ## 4. Fine tuning approach
 
-* **Base model:** `distilbert-base-uncased` (HuggingFace), a small, fast encoder well suited
+- **Base model:** `distilbert-base-uncased` (HuggingFace), a small, fast encoder well suited
   to a 3 class sequence classification task on a few hundred examples.
-* **Setup:** course Colab notebook, free **T4 GPU**, `transformers` `Trainer`. 70/15/15
+- **Setup:** course Colab notebook, free **T4 GPU**, `transformers` `Trainer`. 70/15/15
   stratified split (206 train, 44 validation, 45 test). `TrainingArguments`: 3 epochs, learning
   rate 2e-5, train batch 16 (eval batch 32), weight decay 0.01, 50 warmup steps,
   `load_best_model_at_end=True` on validation accuracy with `save_total_limit=1`.
-* **Key hyperparameter decision and what the training log revealed:** I kept the notebook defaults
+- **Key hyperparameter decision and what the training log revealed:** I kept the notebook defaults
   (3 epochs, lr 2e-5, batch 16). Because of `load_best_model_at_end`, the saved model is the
   **epoch 2** checkpoint (best validation accuracy 0.61; epoch 3 fell to 0.55 on the noisy 44
   example validation set). The more important signal is that **the model underfit**: training and
@@ -103,27 +97,28 @@ dropped as non discourse.
 
 ## 5. Baseline (zero shot Groq)
 
-* **Model:** `llama-3.3-70b-versatile`, temperature 0, classifying each **test** comment with
+- **Model:** `llama-3.3-70b-versatile`, temperature 0, classifying each **test** comment with
   no task specific training.
-* **Prompt:** the exact prompt in [`baseline_prompt.md`](baseline_prompt.md): the label
+- **Prompt:** the exact prompt in [`baseline_prompt.md`](baseline_prompt.md): the label
   definitions verbatim from planning.md, one illustrative example per label (taken from the
   planning §2 taxonomy, **not** from the test set, so the baseline sees no test data), and
   "output only the label name." Passed as a system message with the comment as a separate user
   message.
-* **How results were collected:** run in the notebook's Section 5 over the locked test split.
+- **How results were collected:** run in the notebook's Section 5 over the locked test split.
   All 45 of 45 responses parsed cleanly (0% unparseable), so no prompt tightening was needed.
 
-***
+---
 
 ## 6. Evaluation report
 
 ### 6.1 Headline metrics
-*Test set n = 45 (15% of 294).*
 
-| Metric | Zero shot baseline | Fine tuned DistilBERT |
-|---|---|---|
-| Overall accuracy | **0.844** | 0.622 |
-| Macro F1 | **0.84** | 0.55 |
+_Test set n = 45 (15% of 294)._
+
+| Metric           | Zero shot baseline | Fine tuned DistilBERT |
+| ---------------- | ------------------ | --------------------- |
+| Overall accuracy | **0.844**          | 0.622                 |
+| Macro F1         | **0.84**           | 0.55                  |
 
 **Headline finding: the zero shot 70B baseline beat the fine tuned model by 22 accuracy points
 (0.29 macro F1).** Fine tuning regressed. This is the most important result in the report and §7
@@ -133,14 +128,15 @@ leakage (leakage would inflate the fine tuned score; the classes are balanced; t
 consistent with the fine tuned model's failure on the analysis and hot_take classes below).
 
 ### 6.2 Per class metrics
-| Label | Model | Precision | Recall | F1 | Support |
-|---|---|---|---|---|---|
-| analysis | baseline | 0.85 | 0.85 | 0.85 | 13 |
-| analysis | fine tuned | 0.80 | 0.31 | 0.44 | 13 |
-| hot_take | baseline | 0.73 | 0.92 | 0.81 | 12 |
-| hot_take | fine tuned | 0.42 | 0.42 | 0.42 | 12 |
-| reaction | baseline | 0.94 | 0.80 | 0.86 | 20 |
-| reaction | fine tuned | 0.68 | 0.95 | 0.79 | 20 |
+
+| Label    | Model      | Precision | Recall | F1   | Support |
+| -------- | ---------- | --------- | ------ | ---- | ------- |
+| analysis | baseline   | 0.85      | 0.85   | 0.85 | 13      |
+| analysis | fine tuned | 0.80      | 0.31   | 0.44 | 13      |
+| hot_take | baseline   | 0.73      | 0.92   | 0.81 | 12      |
+| hot_take | fine tuned | 0.42      | 0.42   | 0.42 | 12      |
+| reaction | baseline   | 0.94      | 0.80   | 0.86 | 20      |
+| reaction | fine tuned | 0.68      | 0.95   | 0.79 | 20      |
 
 The per class view is where the regression becomes legible. The baseline is strong and even
 across all three classes (F1 0.85 / 0.81 / 0.86). The fine tuned model is only competitive on
@@ -149,20 +145,21 @@ recalls only 31% of true analysis) and `hot_take` F1 0.42. The boundary the base
 cleanly is exactly the one fine tuning failed to learn.
 
 ### 6.3 Confusion matrix (fine tuned, test set)
-*Rows = true label, columns = predicted. The markdown table below is the primary version; the
-committed image is the same data as a figure.*
+
+_Rows = true label, columns = predicted. The markdown table below is the primary version; the
+committed image is the same data as a figure._
 
 ![Fine tuned model confusion matrix on the test set](outputs/confusion_matrix.png)
 
-| true \ pred | analysis | hot_take | reaction |
-|---|---|---|---|
-| **analysis** | 4 | 6 | 3 |
-| **hot_take** | 1 | 5 | 6 |
-| **reaction** | 0 | 1 | 19 |
+| true \ pred  | analysis | hot_take | reaction |
+| ------------ | -------- | -------- | -------- |
+| **analysis** | 4        | 6        | 3        |
+| **hot_take** | 1        | 5        | 6        |
+| **reaction** | 0        | 1        | 19       |
 
-*Reading: the diagonal (4, 5, 19) is correct. The two heavy off diagonal cells are
+_Reading: the diagonal (4, 5, 19) is correct. The two heavy off diagonal cells are
 analysis to hot_take (6) and hot_take to reaction (6), the two subjective boundaries. reaction
-is almost never missed (19 of 20).*
+is almost never missed (19 of 20)._
 
 ### 6.4 Three wrong predictions, analyzed
 
@@ -172,21 +169,21 @@ and that uncertainty falls on exactly the two subjective boundaries. The three b
 to cover each confusion direction (analysis to hot_take, hot_take to reaction, analysis to
 reaction).
 
-1. **Comment (id `ost0weg`):** *"I didnt read the article but... 11.6k in expenses (140k a
+1. **Comment (id `ost0weg`):** _"I didnt read the article but... 11.6k in expenses (140k a
    year) 7k baby mama fees... even if you cut 60% of his nba earnings for taxes and agent fees
    thats 70 million left over... If he just saved 40 million... thats 400k for 100 years after
-   taxes... His current lifestyle is more than manageable."* **true** `analysis` / **pred**
-   `hot_take` (conf 0.34). *Why:* this is the core `analysis` to `hot_take` failure. The comment
+   taxes... His current lifestyle is more than manageable."_ **true** `analysis` / **pred**
+   `hot_take` (conf 0.34). _Why:_ this is the core `analysis` to `hot_take` failure. The comment
    is a multi step quantitative argument (it does real arithmetic to reach a conclusion), but
    the model reads it as just another confident opinion. It has not learned that the numbers
    here are load bearing rather than decorative. This is a **data and task** problem, not a
    labeling one: with only about 206 training examples, the model never saw enough worked
    numeric arguments to separate "math that supports a claim" from "a stat dropped for effect."
    Fix: more `analysis` examples that reason through numbers, and more `hot_take` examples that
-   cite a stat decoratively, so the boundary is drawn by *how* the number is used.
+   cite a stat decoratively, so the boundary is drawn by _how_ the number is used.
 
-2. **Comment (id `osyv4hk`):** *"I'd prefer we spend the next season with Maluach utilized for
-   20+ minutes to develop."* **true** `hot_take` / **pred** `reaction` (conf 0.37). *Why:* the
+2. **Comment (id `osyv4hk`):** _"I'd prefer we spend the next season with Maluach utilized for
+   20+ minutes to develop."_ **true** `hot_take` / **pred** `reaction` (conf 0.37). _Why:_ the
    `hot_take` to `reaction` failure. This is a calm, standalone roster opinion with no evidence,
    which is the definition of a hot take, but it is short and casually worded, so the model
    keys on register and files it as an in the moment reaction. The model appears to use tone and
@@ -194,9 +191,9 @@ reaction).
    made. Fix: more short, calm `hot_take` examples so brevity and a low key tone stop being
    read as emotional.
 
-3. **Comment (id `osyua9k`):** *"It was literally the same script everytime, Luka dropping
+3. **Comment (id `osyua9k`):** _"It was literally the same script everytime, Luka dropping
    carrying and dropping 30/10/10 thru 3 quarters then wearing down while Kawhi just didnt miss
-   in the 4th."* **true** `analysis` / **pred** `reaction` (conf 0.34). *Why:* this is an
+   in the 4th."_ **true** `analysis` / **pred** `reaction` (conf 0.34). _Why:_ this is an
    observed tactical pattern backed by a stat line (30/10/10, the fourth quarter fade), which is
    `analysis` by the rubric, yet it was predicted `reaction`. It shows that **numbers alone do
    not trigger `analysis`** in this model: combined with the 0.31 `analysis` recall, the model
@@ -205,23 +202,24 @@ reaction).
    human difficulty at this boundary rather than being plainly wrong.
 
 ### 6.5 Sample classifications (fine tuned)
+
 Five test comments run through the fine tuned model (three it got right, two it got wrong). Note
 how compressed the confidence column is: even the correct calls sit at 0.38, barely above the
 0.33 chance floor (see the calibration discussion in §9).
 
-| Comment | Predicted | True | Confidence | Note |
-|---|---|---|---|---|
-| "You're the LeBron James of Quagmires" | reaction | reaction | 38% | ✅ correct. A pure joke with no claim or evidence, an in the moment quip, which is exactly what `reaction` is meant to capture. A reasonable call. |
-| "Slow news day, huh?" | reaction | reaction | 38% | ✅ correct. Offhand snark, no argument. |
-| "What's with the lebron glaze this past week" | reaction | reaction | 38% | ✅ correct. A complaint expressed as a feeling, not an argued claim. |
-| "so ya kawhi lead the raptors to chip and kd hasn't yet" | reaction | hot_take | 35% | ❌ wrong. A confident comparative claim, but short and casual, so the model read the tone as emotion (the hot_take to reaction failure from §6.4). |
-| "I mean skinny big guys like KD and Porzingis got game planned like this. For KD it eventually stops working because he was totally prepared for it..." | hot_take | analysis | 35% | ❌ wrong. A real tactical argument with named comparisons, but the model under credited the reasoning (the analysis to hot_take failure). |
+| Comment                                                                                                                                                 | Predicted | True     | Confidence | Note                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "You're the LeBron James of Quagmires"                                                                                                                  | reaction  | reaction | 38%        | ✅ correct. A pure joke with no claim or evidence, an in the moment quip, which is exactly what `reaction` is meant to capture. A reasonable call. |
+| "Slow news day, huh?"                                                                                                                                   | reaction  | reaction | 38%        | ✅ correct. Offhand snark, no argument.                                                                                                            |
+| "What's with the lebron glaze this past week"                                                                                                           | reaction  | reaction | 38%        | ✅ correct. A complaint expressed as a feeling, not an argued claim.                                                                               |
+| "so ya kawhi lead the raptors to chip and kd hasn't yet"                                                                                                | reaction  | hot_take | 35%        | ❌ wrong. A confident comparative claim, but short and casual, so the model read the tone as emotion (the hot_take to reaction failure from §6.4). |
+| "I mean skinny big guys like KD and Porzingis got game planned like this. For KD it eventually stops working because he was totally prepared for it..." | hot_take  | analysis | 35%        | ❌ wrong. A real tactical argument with named comparisons, but the model under credited the reasoning (the analysis to hot_take failure).          |
 
-***
+---
 
 ## 7. Reflection: what the model learned vs. what I intended
 
-I intended the classifier to learn the taxonomy's real axis: *how a claim is supported*,
+I intended the classifier to learn the taxonomy's real axis: _how a claim is supported_,
 evidence versus assertion versus emotion. What the fine tuned model actually learned, from
 roughly 206 training examples, is mostly the easiest slice of that axis: emotional register maps
 to `reaction`, and it learned that part well (reaction recall 0.95). It did not learn the load
@@ -254,7 +252,7 @@ That uniform low confidence is the softmax mirror of the underfit loss.
 
 ## 8. Spec reflection
 
-* **One way the spec (`planning.md`) helped.** Writing the §3.1 "one stat" decision rule before
+- **One way the spec (`planning.md`) helped.** Writing the §3.1 "one stat" decision rule before
   annotating anything was the single most useful thing the spec did. The rule (label `analysis`
   only if the stat would still support the claim with the opinion framing stripped out, otherwise
   `hot_take`) gave a concrete, repeatable tie breaker for the hardest boundary, so the analysis
@@ -263,7 +261,7 @@ That uniform low confidence is the softmax mirror of the underfit loss.
   model's main failure, that it never learned the load bearing versus decorative distinction
   (§6.4, §7). Without that rule committed to writing first, I could not have told whether the
   model's analysis to hot_take confusion was its fault or my own inconsistent labeling.
-* **One way the implementation diverged from the spec, and why.** Planning §4 specified collecting
+- **One way the implementation diverged from the spec, and why.** Planning §4 specified collecting
   comments with `collect.py` using PRAW, with the public reddit `.json` endpoints as a no auth
   fallback. Neither worked: reddit returned 403 (blocked) on every unauthenticated request from
   this network, and the authenticated API host was unreachable as well. So I pivoted the collector
@@ -280,17 +278,17 @@ That uniform low confidence is the softmax mirror of the underfit loss.
 
 ## 9. Stretch features
 
-* **Deployed interface:** [`app.py`](app.py): Gradio UI, paste a comment → label + confidence
+- **Deployed interface:** [`app.py`](app.py): Gradio UI, paste a comment → label + confidence
   bars. See §10 to run.
-* **Confidence calibration:** binning the 45 test predictions by the confidence of the predicted
+- **Confidence calibration:** binning the 45 test predictions by the confidence of the predicted
   class gives a degenerate reliability table:
 
-  | Confidence bin | n | Avg confidence | Accuracy |
-  |---|---|---|---|
-  | 0.33 to 0.40 | 45 | 0.357 | 0.622 |
-  | 0.40 to 0.50 | 0 | NA | NA |
-  | 0.50 to 0.60 | 0 | NA | NA |
-  | 0.60 to 1.00 | 0 | NA | NA |
+  | Confidence bin | n   | Avg confidence | Accuracy |
+  | -------------- | --- | -------------- | -------- |
+  | 0.33 to 0.40   | 45  | 0.357          | 0.622    |
+  | 0.40 to 0.50   | 0   | NA             | NA       |
+  | 0.50 to 0.60   | 0   | NA             | NA       |
+  | 0.60 to 1.00   | 0   | NA             | NA       |
 
   **Finding: the model's confidence is not meaningful here.** Every single prediction lands in one
   narrow band just above the 0.33 random floor; the model never produces a confidence above 0.40.
@@ -302,15 +300,18 @@ That uniform low confidence is the softmax mirror of the underfit loss.
   to uniform. The model is never confidently wrong, but it is never confidently right either, so
   confidence offers no usable signal for a deployed tool. (Reproduce locally with
   `python analysis/analyze.py --test data/test_split.csv` once `takemeter-model/` is downloaded.)
-* **Error pattern analysis:** the systematic pattern is two directional confusions: `analysis`
+
+- **Error pattern analysis:** the systematic pattern is two directional confusions: `analysis`
   predicted `hot_take` (the model under credits real, sometimes non numeric reasoning) and
   `hot_take` predicted `reaction` (short or casual opinions read as emotional venting). Numbers
   alone do not trigger `analysis`. My original hypothesis (sarcasm plus the analysis versus
   hot_take boundary) is half confirmed: analysis versus hot_take is indeed the dominant error
   source, but the bigger surprise is `hot_take` leaking into `reaction` through tone. Verified by
   rereading the 17 misclassifications, not just counting them.
-* **Inter annotator reliability:** [`analysis/iaa.py`](analysis/iaa.py): a second annotator
-  labeled 30 examples; Cohen's kappa + agreement + disagreement analysis. ⏳ *numbers here.*
+- **Inter annotator reliability:** not completed. This stretch needs a second human annotator,
+  which I did not have. [`analysis/iaa.py`](analysis/iaa.py) is ready: `--export` writes a 30
+  example subset for a second labeler and `--compare` computes Cohen's kappa and agreement once
+  they return it.
 
 ## 10. How to run
 
@@ -341,19 +342,15 @@ python analysis/iaa.py --compare           # after they return iaa_subset_annota
 
 ## 11. AI usage
 
-*(At least 2 specific instances: what I directed the tool to do, what it produced, what I
-changed or overrode. Disclose any annotation assistance.)*
-
-1. **Label stress testing.** I gave Claude my draft label definitions + edge cases and asked
-   it to generate boundary case comments. ⏳ *(record which definitions I tightened as a result.)*
-2. **Failure pattern analysis.** I pasted `analysis/errors_for_llm.md` into an LLM and asked
-   for systematic error patterns, then verified each by rereading the examples. ⏳ *(record
-   what it found and what I discarded.)*
-3. **(If used) Annotation assistance.** Groq prelabeled raw comments via `prelabel.py`; I
-   reviewed and corrected **every** label by hand (changes flagged in the `notes` column). ⏳
-   *(record how often the LLM disagreed with my final call.)*
+1. **Label stress testing.** I gave an LLM my draft label definitions and edge cases and asked it
+   to generate boundary case comments to test whether the definitions held.
+2. **Failure pattern analysis.** I used an LLM to surface systematic patterns in the model's wrong
+   predictions, then verified each pattern by rereading the examples myself.
+3. **Annotation assistance.** Groq prelabeled the raw comments via `prelabel.py`, and every label
+   was then reviewed and corrected with AI assistance (changes flagged in the `notes` column).
 
 ## 12. Demo video
 
-⏳ *(link to the 3 to 5 min demo: 3 to 5 comments classified with label + confidence, one correct
-narrated, one incorrect narrated, and a walkthrough of the evaluation report.)*
+[![TakeMeter demo video](https://img.youtube.com/vi/ul0_t4qOuyc/maxresdefault.jpg)](https://youtu.be/ul0_t4qOuyc)
+
+Click thumbnail to watch demo on YouTube: [https://youtu.be/ul0_t4qOuyc](https://youtu.be/ul0_t4qOuyc)
