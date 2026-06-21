@@ -120,8 +120,10 @@ dropped as non discourse.
 | reaction | fine tuned | 0.68 | 0.95 | 0.79 | 20 |
 
 ### 6.3 Confusion matrix (fine tuned, test set)
-*Rows = true label, columns = predicted. Also committed as
-[`outputs/confusion_matrix.png`](outputs/confusion_matrix.png).*
+*Rows = true label, columns = predicted. The markdown table below is the primary version; the
+committed image is the same data as a figure.*
+
+![Fine tuned model confusion matrix on the test set](outputs/confusion_matrix.png)
 
 | true \ pred | analysis | hot_take | reaction |
 |---|---|---|---|
