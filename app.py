@@ -78,7 +78,9 @@ def _load():
 def predict(text: str):
     """Return (label, confidence, full_prob_dict)."""
     _load()
-    inputs = _tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
+    # DistilBERT does not accept token_type_ids; some tokenizer versions emit them.
+    inputs = _tokenizer(text, return_tensors="pt", truncation=True, max_length=256,
+                        return_token_type_ids=False)
     with torch.no_grad():
         logits = _model(**inputs).logits
     probs = F.softmax(logits, dim=-1)[0]

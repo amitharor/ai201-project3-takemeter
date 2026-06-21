@@ -68,7 +68,9 @@ def load_model():
 def predict_all(tok, model, id2label, texts):
     preds, confs, all_probs = [], [], []
     for text in texts:
-        inputs = tok(text, return_tensors="pt", truncation=True, max_length=256)
+        # DistilBERT does not accept token_type_ids; some tokenizer versions emit them.
+        inputs = tok(text, return_tensors="pt", truncation=True, max_length=256,
+                     return_token_type_ids=False)
         with torch.no_grad():
             logits = model(**inputs).logits
         probs = F.softmax(logits, dim=-1)[0]
