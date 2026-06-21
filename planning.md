@@ -114,12 +114,17 @@ Designed *before* annotation; expanded with real cases found *during* annotation
 
 ## 4. Data collection plan
 
-* **Source:** public comments on r/nba, pulled with `collect.py` (PRAW, with a no auth
-  `reddit.com/...json` fallback). Public content only, no auth walled or private data.
-* **Thread mix (to guarantee label variety):** ~40% **Game Threads / Post Game Threads**
-  (rich in `reaction`), ~40% **discussion/"Daily Discussion"/analysis posts** (rich in
-  `analysis` and `hot_take`), ~20% **hot take bait posts** (e.g. "unpopular opinion" threads).
-  Sampling from a topic mix prevents the model from learning "game thread means reaction."
+* **Source:** public comments on r/nba, pulled with `collect.py`. Reddit blocks
+  unauthenticated requests (403) from this network, and the official API host was also
+  unreachable, so the default backend is the **arctic-shift public reddit archive**, a no auth
+  mirror of public reddit data. PRAW and the direct `.json` endpoints remain as alternate
+  backends (`--source`) for any network where reddit is reachable. Public content only, no
+  auth walled or private data.
+* **Source mix (to guarantee label variety):** ~65% from **r/nba** (a broad discourse mix:
+  game thread reactions, confident `hot_take` opinions, and some breakdowns) and ~35% from
+  **r/nbadiscussion** (rich in `analysis`). Pulling from two sources prevents the model from
+  keying on one subreddit's style, and the real labels are assigned per comment by content,
+  not by source.
 * **Volume:** collect ~300 raw comments, then label down to **≥200** clean examples.
 * **Target distribution:** aim **~33% each**, hard floor **≥20% per class**, hard ceiling
   **≤70%** for any class (assignment requirement).
